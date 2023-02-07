@@ -1,0 +1,232 @@
+---
+title: "networkKDE"
+output: html_document
+---
+
+```{r}
+#环境配置
+library(spNetwork)
+library(tmap)
+library(sf)
+#读文件
+roadNet=st_read('简化后城市道路投影.shp')
+rddSample=st_read('采样点包含等级.shp')
+#生成事件数据 分类-全
+rddT00<-rddSample[which(rddSample$D00c>0),]
+rddT10<-rddSample[which(rddSample$D10c>0),]
+rddT20<-rddSample[which(rddSample$D20c>0),]
+rddT40<-rddSample[which(rddSample$D40c>0),]
+rddTall<-rddSample[which(rddSample$type=='S'| rddSample$type=='H'),]
+```
+
+```{r}
+#配置多线程 查看运行中线程数
+library(future)
+future::plan(future::multisession(workers=7))
+nbrOfWorkers()
+```
+
+```{r}
+#kfun计算
+kfun_T00 <- kfunctions.mc(roadNet, rddT00,
+                           start = 0, end = 5000, step = 50, 
+                           width = 1000, nsim = 50, resolution = 50,
+                           verbose = TRUE,agg=5, conf_int = 0.05)
+kfun_T10 <- kfunctions.mc(roadNet, rddT10,
+                           start = 0, end = 5000, step = 50, 
+                           width = 1000, nsim = 50, resolution = 50,
+                           verbose = TRUE,agg=5, conf_int = 0.05)
+kfun_T20 <- kfunctions.mc(roadNet, rddT20,
+                           start = 0, end = 5000, step = 50, 
+                           width = 1000, nsim = 50, resolution = 50,
+                           verbose = TRUE,agg=5, conf_int = 0.05)
+kfun_T40 <- kfunctions.mc(roadNet, rddT40,
+                           start = 0, end = 5000, step = 50, 
+                           width = 1000, nsim = 50, resolution = 50,
+                           verbose = TRUE,agg=5, conf_int = 0.05)
+kfun_Tall <- kfunctions.mc(roadNet, rddTall,
+                           start = 0, end = 5000, step = 50, 
+                           width = 1000, nsim = 50, resolution = 50,
+                           verbose = TRUE,agg=5, conf_int = 0.05)
+
+
+```
+
+```{r}
+library(data.table)
+rddT00rn<- as.data.table(rddT00,keep.rownames=T)
+rddT10rn<- as.data.table(rddT10,keep.rownames=T)
+rddT20rn<- as.data.table(rddT20,keep.rownames=T)
+rddT40rn<- as.data.table(rddT40,keep.rownames=T)
+```
+
+```{r}
+myCount<-0
+myrnList <- vector(mode='character',length=0)
+for (item in rownames(rddT00)){
+  if(!(item %in% rownames(rddT10))){
+    myCount=myCount+1
+    myrnList<-append(myrnList,item)
+  }
+}
+rddT00R01<-rddT00[myrnList,]
+
+myCount<-0
+myrnList <- vector(mode='character',length=0)
+for (item in rownames(rddT00)){
+  if(!(item %in% rownames(rddT20))){
+    myCount=myCount+1
+    myrnList<-append(myrnList,item)
+  }
+}
+rddT00R02<-rddT00[myrnList,]
+
+myCount<-0
+myrnList <- vector(mode='character',length=0)
+for (item in rownames(rddT00)){
+  if(!(item %in% rownames(rddT40))){
+    myCount=myCount+1
+    myrnList<-append(myrnList,item)
+  }
+}
+rddT00R04<-rddT00[myrnList,]
+
+myCount<-0
+myrnList <- vector(mode='character',length=0)
+for (item in rownames(rddT10)){
+  if(!(item %in% rownames(rddT20))){
+    myCount=myCount+1
+    myrnList<-append(myrnList,item)
+  }
+}
+rddT10R12<-rddT10[myrnList,]
+
+myCount<-0
+myrnList <- vector(mode='character',length=0)
+for (item in rownames(rddT10)){
+  if(!(item %in% rownames(rddT40))){
+    myCount=myCount+1
+    myrnList<-append(myrnList,item)
+  }
+}
+rddT10R14<-rddT10[myrnList,]
+
+myCount<-0
+myrnList <- vector(mode='character',length=0)
+for (item in rownames(rddT20)){
+  if(!(item %in% rownames(rddT40))){
+    myCount=myCount+1
+    myrnList<-append(myrnList,item)
+  }
+}
+rddT20R24<-rddT20[myrnList,]
+```
+```{r}
+#交叉k函数
+kcfun_T01<-cross_kfunctions(roadNet,rddT00R01,rddT10,
+                               start = 0, end = 5000, step = 50, 
+                               width = 1000, nsim = 50, resolution = 50,
+                               verbose = TRUE,agg=5, conf_int = 0.05
+                               )
+
+kcfun_T02<-cross_kfunctions(roadNet,rddT00R02,rddT20,
+                               start = 0, end = 5000, step = 50, 
+                               width = 1000, nsim = 50, resolution = 50,
+                               verbose = TRUE,agg=5, conf_int = 0.05
+                               )
+kcfun_T04<-cross_kfunctions(roadNet,rddT00R04,rddT40,
+                               start = 0, end = 5000, step = 50, 
+                               width = 1000, nsim = 50, resolution = 50,
+                               verbose = TRUE,agg=5, conf_int = 0.05
+                               )
+kcfun_T12<-cross_kfunctions(roadNet,rddT10R12,rddT20,
+                               start = 0, end = 5000, step = 50, 
+                               width = 1000, nsim = 50, resolution = 50,
+                               verbose = TRUE,agg=5, conf_int = 0.05
+                               )
+kcfun_T14<-cross_kfunctions(roadNet,rddT10R14,rddT40,
+                               start = 0, end = 5000, step = 50, 
+                               width = 1000, nsim = 50, resolution = 50,
+                               verbose = TRUE,agg=5, conf_int = 0.05
+                               )
+kcfun_T24<-cross_kfunctions(roadNet,rddT20R24,rddT40,
+                               start = 0, end = 5000, step = 50, 
+                               width = 1000, nsim = 50, resolution = 50,
+                               verbose = TRUE,agg=5, conf_int = 0.05
+                               )
+```
+
+```{r}
+library(ggplot2)
+windowsFonts(A=windowsFont("Times New Roman"))
+#绘图
+picK00<-kfun_T00$plotg+
+  theme_bw()+
+  xlab("距离/m")+
+  ylab("G函数")+
+  theme(axis.title=element_text(size=12,family="A"),axis.text=element_text(size=12,family="A"))
+ggsave("picK00.bmp",picK00,width=1400,height=1200,units="px")
+
+picK10<-kfun_T10$plotg+
+  theme_bw()+
+  xlab("距离/m")+
+  ylab("G函数")+
+  theme(axis.title=element_text(size=12,family="A"),axis.text=element_text(size=12,family="A"))
+ggsave("picK10.bmp",picK10,width=1400,height=1200,units="px")
+
+picK20<-kfun_T20$plotg+
+  theme_bw()+
+  xlab("距离/m")+
+  ylab("G函数")+
+  theme(axis.title=element_text(size=12,family="A"),axis.text=element_text(size=12,family="A"))
+ggsave("picK20.bmp",picK20,width=1400,height=1200,units="px")
+
+picK40<-kfun_T40$plotg+
+  theme_bw()+
+  xlab("距离/m")+
+  ylab("G函数")+
+  theme(axis.title=element_text(size=12,family="A"),axis.text=element_text(size=12,family="A"))
+ggsave("picK40.bmp",picK40,width=1400,height=1200,units="px")
+
+picCK01<-kcfun_T01$plotg+
+  theme_bw()+
+  xlab("距离/m")+
+  ylab("交叉G函数")+
+  theme(axis.title=element_text(size=12,family="A"),axis.text=element_text(size=12,family="A"))
+ggsave("picCK01.bmp",picCK01,width=1400,height=1200,units="px")
+
+picCK02<-kcfun_T02$plotg+
+  theme_bw()+
+  xlab("距离/m")+
+  ylab("交叉G函数")+
+  theme(axis.title=element_text(size=12,family="A"),axis.text=element_text(size=12,family="A"))
+ggsave("picCK02.bmp",picCK02,width=1400,height=1200,units="px")
+
+picCK04<-kcfun_T04$plotg+
+  theme_bw()+
+  xlab("距离/m")+
+  ylab("交叉G函数")+
+  theme(axis.title=element_text(size=12,family="A"),axis.text=element_text(size=12,family="A"))
+ggsave("picCK04.bmp",picCK04,width=1400,height=1200,units="px")
+
+picCK12<-kcfun_T12$plotg+
+  theme_bw()+
+  xlab("距离/m")+
+  ylab("交叉G函数")+
+  theme(axis.title=element_text(size=12,family="A"),axis.text=element_text(size=12,family="A"))
+ggsave("picCK12.bmp",picCK12,width=1400,height=1200,units="px")
+
+picCK14<-kcfun_T14$plotg+
+  theme_bw()+
+  xlab("距离/m")+
+  ylab("交叉G函数")+
+  theme(axis.title=element_text(size=12,family="A"),axis.text=element_text(size=12,family="A"))
+ggsave("picCK14.bmp",picCK14,width=1400,height=1200,units="px")
+
+picCK24<-kcfun_T24$plotg+
+  theme_bw()+
+  xlab("距离/m")+
+  ylab("交叉G函数")+
+  theme(axis.title=element_text(size=12,family="A"),axis.text=element_text(size=12,family="A"))
+ggsave("picCK24.bmp",picCK24,width=1400,height=1200,units="px")
+```

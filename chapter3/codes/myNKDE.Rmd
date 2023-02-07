@@ -1,0 +1,332 @@
+---
+title: "networkKDE"
+output: html_document
+---
+
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r}
+#环境配置
+library(spNetwork)
+library(tmap)
+library(sf)
+#读文件
+roadNet=st_read('简化后城市道路投影.shp')
+rddSample=st_read('采样点包含等级.shp')
+#数据制作
+#密度绘制采样点
+roadSample_20 <- lines_points_along(roadNet, 20)
+roadSample_50 <- lines_points_along(roadNet, 50)
+#事件数据 分类-全
+rddT00<-rddSample[which(rddSample$D00c>0),]
+rddT10<-rddSample[which(rddSample$D10c>0),]
+rddT20<-rddSample[which(rddSample$D20c>0),]
+rddT40<-rddSample[which(rddSample$D40c>0),]
+rddTall<-rddSample[which(rddSample$type=='S'| rddSample$type=='H'),]
+#权重数据
+myWeight<-rep(1,nrow(rddTall))
+for (i in 1:as.numeric(nrow(rddTall))){
+  if (rddTall$type[i]=="S"){
+    myWeight[i]=1
+  }else{
+    myWeight[i]=5
+  }
+}
+
+```
+
+```{r}
+#密度网络
+densities <- nkde(lines = roadNet,
+                 events = rdds,
+                 w = rep(1,nrow(rdds)),
+                 samples = roadSample_300,
+                 kernel_name = "quartic",
+                 bw = 300, div= "bw",
+                 method = "discontinuous",
+                 digits = 2, tol =  0.1,
+                 grid_shape = c(1,1),
+                 max_depth = 8,
+                 agg = 5, sparse = TRUE,
+                 verbose = FALSE)
+densities <- densities*1000
+roadSample_300$density <- densities
+
+tm_shape(roadSample_300) + 
+  tm_dots(col = "density", size = 0.05, palette = "viridis",
+          n = 3, style = "kmeans")
+```
+
+```{r}
+#配置多线程 查看运行中线程数
+library(future)
+future::plan(future::multisession(workers=7))
+nbrOfWorkers()
+```
+
+```{r}
+#测试基本参数配置 用T00实验
+#交叉验证 最佳带宽
+bws_selection_cv <- bw_cv_likelihood_calc.mc(
+  bw_range = c(100,300),
+  bw_step = 20,
+  lines = roadNet, 
+  events = rddT00,
+  w = rep(1,nrow(rddT00)),
+  kernel_name = "quartic", 
+  method = "continuous",
+  diggle_correction = FALSE, 
+  study_area = NULL,
+  max_depth = 8,
+  digits=2, 
+  tol=0.1,
+  agg=NULL, 
+  sparse=TRUE, 
+  grid_shape=c(1,1),
+  zero_strat = "remove",
+  verbose=FALSE, check=FALSE)
+#采样粒度
+densities4sp20 <- nkde(lines = roadNet,
+                 events = rddT00,
+                 w = rep(1,nrow(rddT00)),
+                 samples = roadSample_20,
+                 kernel_name = "quartic",
+                 bw=150,
+                 adaptive = FALSE,
+                 method = "continuous",
+                 div= "bw",
+                 diggle_correction = FALSE,
+                 study_area = NULL,
+                 max_depth = 8,
+                 digits = 3, 
+                 tol =  0.1,
+                 agg = NULL,
+                 sparse = TRUE,
+                 grid_shape = c(1,1),
+                 verbose = TRUE,
+                 check = FALSE)
+densities4T00sp50 <- nkde(lines = roadNet,
+                 events = rddT00,
+                 w = rep(1,nrow(rddT00)),
+                 samples = roadSample_50,
+                 kernel_name = "quartic",
+                 bw=150,
+                 adaptive = FALSE,
+                 method = "continuous",
+                 div= "bw",
+                 diggle_correction = FALSE,
+                 study_area = NULL,
+                 max_depth = 8,
+                 digits = 3, 
+                 tol =  0.1,
+                 agg = NULL,
+                 sparse = TRUE,
+                 grid_shape = c(1,1),
+                 verbose = TRUE,
+                 check = FALSE)
+
+```
+
+
+```{r}
+densities4T00sp50<- densities4T00sp50*1000
+roadSample_50$density <- densities4T00sp50
+
+tm_shape(roadSample_50) + 
+  tm_dots(col = "density", size = 0.05, palette = "viridis",
+          n = 3, style = "kmeans")
+```
+```{r}
+#绘图实验
+#T00
+densities4T00sp20 <- nkde(lines = roadNet,
+                 events = rddT00,
+                 w = rep(1,nrow(rddT00)),
+                 samples = roadSample_20,
+                 kernel_name = "quartic",
+                 bw=150,
+                 adaptive = FALSE,
+                 method = "continuous",
+                 div= "bw",
+                 diggle_correction = FALSE,
+                 study_area = NULL,
+                 max_depth = 8,
+                 digits = 3, 
+                 tol =  0.1,
+                 agg = NULL,
+                 sparse = TRUE,
+                 grid_shape = c(1,1),
+                 verbose = TRUE,
+                 check = FALSE)
+densities4T00sp20<- densities4T00sp20*1000
+roadSample_20$densityT00 <- densities4T00sp20
+#T10
+densities4T10sp20 <- nkde(lines = roadNet,
+                 events = rddT10,
+                 w = rep(1,nrow(rddT10)),
+                 samples = roadSample_20,
+                 kernel_name = "quartic",
+                 bw=150,
+                 adaptive = FALSE,
+                 method = "continuous",
+                 div= "bw",
+                 diggle_correction = FALSE,
+                 study_area = NULL,
+                 max_depth = 8,
+                 digits = 3, 
+                 tol =  0.1,
+                 agg = NULL,
+                 sparse = TRUE,
+                 grid_shape = c(1,1),
+                 verbose = TRUE,
+                 check = FALSE)
+densities4T10sp20<- densities4T10sp20*1000
+roadSample_20$densityT10 <- densities4T10sp20
+#T20
+densities4T20sp20 <- nkde(lines = roadNet,
+                 events = rddT20,
+                 w = rep(1,nrow(rddT20)),
+                 samples = roadSample_20,
+                 kernel_name = "quartic",
+                 bw=150,
+                 adaptive = FALSE,
+                 method = "continuous",
+                 div= "bw",
+                 diggle_correction = FALSE,
+                 study_area = NULL,
+                 max_depth = 8,
+                 digits = 3, 
+                 tol =  0.1,
+                 agg = NULL,
+                 sparse = TRUE,
+                 grid_shape = c(1,1),
+                 verbose = TRUE,
+                 check = FALSE)
+densities4T20sp20<- densities4T20sp20*1000
+roadSample_20$densityT20 <- densities4T20sp20
+#T40
+densities4T40sp20 <- nkde(lines = roadNet,
+                 events = rddT40,
+                 w = rep(1,nrow(rddT40)),
+                 samples = roadSample_20,
+                 kernel_name = "quartic",
+                 bw=150,
+                 adaptive = FALSE,
+                 method = "continuous",
+                 div= "bw",
+                 diggle_correction = FALSE,
+                 study_area = NULL,
+                 max_depth = 8,
+                 digits = 3, 
+                 tol =  0.1,
+                 agg = NULL,
+                 sparse = TRUE,
+                 grid_shape = c(1,1),
+                 verbose = TRUE,
+                 check = FALSE)
+densities4T40sp20<- densities4T40sp20*1000
+roadSample_20$densityT40 <- densities4T40sp20
+#Tall
+densities4Tallsp20 <- nkde(lines = roadNet,
+                 events = rddTall,
+                 w = myWeight,
+                 samples = roadSample_20,
+                 kernel_name = "quartic",
+                 bw=150,
+                 adaptive = FALSE,
+                 method = "continuous",
+                 div= "bw",
+                 diggle_correction = FALSE,
+                 study_area = NULL,
+                 max_depth = 8,
+                 digits = 3, 
+                 tol =  0.1,
+                 agg = NULL,
+                 sparse = TRUE,
+                 grid_shape = c(1,1),
+                 verbose = TRUE,
+                 check = FALSE)
+densities4Tallsp20<- densities4Tallsp20*1000
+roadSample_20$densityTall <- densities4Tallsp20
+```
+
+```{r}
+lixelines <- lixelize_lines(roadNet, 20,0)
+tm_shape(roadSample_20) + tm_dots()
+```
+```{r}
+myCount<-0
+for (item in rnP){
+  if(item %in% rnL){
+    myCount=myCount+1
+  }
+}
+```
+
+```{r}
+densities4Tallsp20x <- nkde(lines = roadNet,
+                 events = rddTall,
+                 w = myWeight,
+                 samples = roadSample_20,
+                 kernel_name = "quartic",
+                 bw=150,
+                 adaptive = FALSE,
+                 method = "continuous",
+                 div= "bw",
+                 diggle_correction = FALSE,
+                 study_area = NULL,
+                 max_depth = 8,
+                 digits = 3, 
+                 tol =  0.1,
+                 agg = NULL,
+                 sparse = TRUE,
+                 grid_shape = c(1,1),
+                 verbose = TRUE,
+                 check = FALSE)
+densities4Tallsp20x<- densities4Tallsp20x*1000
+roadSample_20$densityTallx <- densities4Tallsp20x
+```
+
+```{r}
+densities4T00sp2000 <- nkde(lines = roadNet,
+                 events = rddT00,
+                 w = rep(1,nrow(rddT00)),
+                 samples = roadSample_20,
+                 kernel_name = "quartic",
+                 bw=150,
+                 adaptive = FALSE,
+                 method = "continuous",
+                 div= "bw",
+                 diggle_correction = FALSE,
+                 study_area = NULL,
+                 max_depth = 8,
+                 digits = 3, 
+                 tol =  0.1,
+                 agg = NULL,
+                 sparse = TRUE,
+                 grid_shape = c(1,1),
+                 verbose = TRUE,
+                 check = FALSE)
+```
+
+```{r}
+band<-read.csv('bandwidth.csv')
+```
+```{r}
+library(ggplot2)
+windowsFonts(A=windowsFont("Times New Roman"))
+```
+
+```{r}
+pic<-ggplot()+
+  geom_line(data = band,aes(x = bandwidth,y = score,colour = "myRed"),size=1)+
+  geom_point(data = band,aes(x = bandwidth,y = score,colour = "myBlack"),size=1)+
+  xlab("带宽/m")+ylab("得分")+    
+  scale_color_manual(values=c(myRed="#FE817D",myBlack="#111111"))+
+  scale_x_continuous(n.breaks=11)+
+  theme_bw()+
+  theme(axis.title=element_text(size=12,family="A"),
+           axis.text=element_text(size=12,family="A"))
+ggsave("带宽得分可视化.bmp",pic,width=2000,height=1200,units="px")
+```
+
